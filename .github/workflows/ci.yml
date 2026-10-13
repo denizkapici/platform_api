@@ -1,0 +1,42 @@
+name: Platform API DevSecOps Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  security-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodları Çek (Checkout)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Şifre ve Token Sızıntı Taraması (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Buildx Kurulumu
+        uses: docker/setup-buildx-action@v3
+
+      - name: Tarama İçin İmajı Derle (Push Etmeden)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: platform-api:local-test
+
+      - name: Konteyner Güvenlik Taraması (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'platform-api:local-test'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
